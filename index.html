@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TESDA Assessment Application Form</title>
-  <script src="/_sdk/data_sdk.js"></script>
   <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       box-sizing: border-box;
@@ -449,6 +449,25 @@
     .error-message.show {
       display: block;
     }
+
+    .info-box {
+      background: #dbeafe;
+      border-left: 4px solid #3b82f6;
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .info-box p {
+      margin: 0;
+      color: #1e40af;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .info-box strong {
+      color: #1e3a8a;
+    }
     
     @keyframes slideDown {
       from {
@@ -485,19 +504,23 @@
     }
   </style>
   <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
   <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
  </head>
  <body>
   <main class="container">
    <div class="form-card">
     <div id="successMessage" class="success-message">
-     ✓ Application submitted successfully! Your form has been recorded.
+     ✓ Application downloaded successfully! Check your downloads folder.
     </div>
     <div id="errorMessage" class="error-message"></div>
     <header class="form-header">
      <h1 id="formTitle">APPLICATION FORM</h1>
      <h2 id="formSubtitle">TESDA Assessment Application</h2>
     </header>
+    <div class="info-box">
+     <p><strong>📥 Download Mode:</strong> When you submit this form, it will download as a text file containing all your information. Save this file and submit it to your assessment center.</p>
+    </div>
     <div class="reference-section">
      <p><strong>REFERENCE NUMBER:</strong> To be assigned by Assessment Center</p>
      <p><strong>UNIQUE LEARNERS IDENTIFIER (ULI):</strong> To be filled out by the Processing Officer</p>
@@ -766,7 +789,7 @@
        </div>
       </div>
      </div><!-- Submit Button -->
-     <div class="submit-section"><button type="submit" class="btn-submit" id="submitBtn">Submit Application Form</button>
+     <div class="submit-section"><button type="submit" class="btn-submit" id="submitBtn">Download Application</button>
      </div>
     </form>
    </div>
@@ -947,32 +970,45 @@
     });
 
     // Collect table data
-    function collectTableData(tableId, rowClass) {
+    function collectTableData(tableId) {
       const rows = document.querySelectorAll(`#${tableId} tbody tr`);
       const data = [];
       rows.forEach(row => {
         const inputs = row.querySelectorAll('input');
-        const rowData = {};
+        const rowData = [];
         inputs.forEach(input => {
-          if (input.value.trim()) {
-            rowData[input.className] = input.value;
+          if (input.value.trim() && !input.classList.contains('btn-remove-row')) {
+            rowData.push(input.value);
           }
         });
-        if (Object.keys(rowData).length > 0) {
-          data.push(rowData);
+        if (rowData.length > 0) {
+          data.push(rowData.join(' | '));
         }
       });
-      return JSON.stringify(data);
+      return data.join('\n      ');
     }
 
     // Collect checkbox values
     function collectCheckboxes(name) {
       const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
-      return Array.from(checkboxes).map(cb => cb.value).join(', ');
+      return Array.from(checkboxes).map(cb => cb.value).join(', ') || 'None';
+    }
+
+    // Download function
+    function downloadTextFile(content, filename) {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     // Form submission
-    document.getElementById('applicationForm').addEventListener('submit', async (e) => {
+    document.getElementById('applicationForm').addEventListener('submit', (e) => {
       e.preventDefault();
       
       const submitBtn = document.getElementById('submitBtn');
@@ -994,81 +1030,107 @@
       }
       
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
+      submitBtn.textContent = 'Generating...';
       
       const formData = new FormData(e.target);
       
-      const applicationData = {
-        id: Date.now().toString(),
-        submittedAt: new Date().toISOString(),
-        schoolName: formData.get('schoolName'),
-        schoolAddress: formData.get('schoolAddress'),
-        assessmentTitle: formData.get('assessmentTitle'),
-        assessmentType: collectCheckboxes('assessmentType'),
-        clientType: collectCheckboxes('clientType'),
-        surname: formData.get('surname'),
-        firstname: formData.get('firstname'),
-        middleName: formData.get('middleName'),
-        middleInitial: formData.get('middleInitial') || '',
-        nameExtension: formData.get('nameExtension') || '',
-        mailingStreet: formData.get('mailingStreet'),
-        mailingBarangay: formData.get('mailingBarangay'),
-        mailingDistrict: formData.get('mailingDistrict') || '',
-        mailingCity: formData.get('mailingCity'),
-        mailingProvince: formData.get('mailingProvince'),
-        mailingRegion: formData.get('mailingRegion'),
-        mailingZipCode: formData.get('mailingZipCode'),
-        motherName: formData.get('motherName'),
-        fatherName: formData.get('fatherName'),
-        sex: formData.get('sex'),
-        civilStatus: formData.get('civilStatus'),
-        contactTel: formData.get('contactTel') || '',
-        contactMobile: formData.get('contactMobile'),
-        contactEmail: formData.get('contactEmail'),
-        contactFax: formData.get('contactFax') || '',
-        educationalAttainment: formData.get('educationalAttainment'),
-        employmentStatus: formData.get('employmentStatus'),
-        birthdate: formData.get('birthdate'),
-        birthplace: formData.get('birthplace'),
-        age: formData.get('age'),
-        workExperience: collectTableData('workExperienceTable', 'work'),
-        trainingSeminars: collectTableData('trainingSeminarsTable', 'training'),
-        licensureExams: collectTableData('licensureTable', 'licensure'),
-        competencyAssessments: collectTableData('competencyTable', 'comp'),
-        photoData: photoData,
-        signatureData: signatureCanvas.toDataURL()
-      };
+      // Create formatted text content
+      const content = `
+TESDA ASSESSMENT APPLICATION FORM
+==================================
+Submitted: ${new Date().toLocaleString()}
+
+SCHOOL/TRAINING CENTER INFORMATION
+-----------------------------------
+Name: ${formData.get('schoolName')}
+Address: ${formData.get('schoolAddress')}
+Assessment Title: ${formData.get('assessmentTitle')}
+Assessment Type: ${collectCheckboxes('assessmentType')}
+
+1. CLIENT TYPE
+--------------
+${collectCheckboxes('clientType')}
+
+2. PROFILE
+----------
+2.1. Name:
+    Surname: ${formData.get('surname')}
+    First Name: ${formData.get('firstname')}
+    Middle Name: ${formData.get('middleName')}
+    Middle Initial: ${formData.get('middleInitial') || 'N/A'}
+    Name Extension: ${formData.get('nameExtension') || 'N/A'}
+
+2.2. Mailing Address:
+    Street: ${formData.get('mailingStreet')}
+    Barangay: ${formData.get('mailingBarangay')}
+    District: ${formData.get('mailingDistrict') || 'N/A'}
+    City: ${formData.get('mailingCity')}
+    Province: ${formData.get('mailingProvince')}
+    Region: ${formData.get('mailingRegion')}
+    Zip Code: ${formData.get('mailingZipCode')}
+
+2.3. Mother's Name: ${formData.get('motherName')}
+2.4. Father's Name: ${formData.get('fatherName')}
+
+2.5. Sex: ${formData.get('sex')}
+2.6. Civil Status: ${formData.get('civilStatus')}
+
+2.7. Contact Number(s):
+    Tel: ${formData.get('contactTel') || 'N/A'}
+    Mobile: ${formData.get('contactMobile')}
+    Email: ${formData.get('contactEmail')}
+    Fax: ${formData.get('contactFax') || 'N/A'}
+
+2.8. Highest Educational Attainment: ${formData.get('educationalAttainment')}
+2.9. Employment Status: ${formData.get('employmentStatus')}
+
+2.10. Birth date: ${formData.get('birthdate')}
+2.11. Birth place: ${formData.get('birthplace')}
+2.12. Age: ${formData.get('age')}
+
+3. WORK EXPERIENCE
+------------------
+${collectTableData('workExperienceTable') || 'None'}
+
+4. TRAINING/SEMINARS ATTENDED
+------------------------------
+${collectTableData('trainingSeminarsTable') || 'None'}
+
+5. LICENSURE EXAMINATION(S) PASSED
+-----------------------------------
+${collectTableData('licensureTable') || 'None'}
+
+6. COMPETENCY ASSESSMENT(S) PASSED
+-----------------------------------
+${collectTableData('competencyTable') || 'None'}
+
+ATTACHMENTS
+-----------
+Photo: Included (base64 data - see separate file)
+Signature: Included (base64 data - see separate file)
+
+NOTE: Photo and signature images are saved as separate data in this file.
+Please review the downloaded file and attach the images when submitting.
+
+==================================
+END OF APPLICATION FORM
+==================================
+      `;
       
-      const result = await window.dataSdk.create(applicationData);
+      // Create filename with applicant name and timestamp
+      const filename = `TESDA_Application_${formData.get('surname')}_${formData.get('firstname')}_${Date.now()}.txt`;
       
-      if (result.isOk) {
-        successMessage.classList.add('show');
-        e.target.reset();
-        signatureCtx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
-        hasSignature = false;
-        photoData = null;
-        document.getElementById('photoPreview').innerHTML = '📷';
-        document.getElementById('photoPreview').classList.add('empty');
-        
-        setTimeout(() => {
-          successMessage.classList.remove('show');
-        }, 5000);
-      } else {
-        errorMessage.textContent = 'Failed to submit application. Please try again.';
-        errorMessage.classList.add('show');
-        setTimeout(() => errorMessage.classList.remove('show'), 3000);
-      }
+      // Download the file
+      downloadTextFile(content, filename);
+      
+      successMessage.classList.add('show');
+      setTimeout(() => {
+        successMessage.classList.remove('show');
+      }, 5000);
       
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Submit Application Form';
+      submitBtn.textContent = 'Download Application';
     });
-
-    // Data SDK handler
-    const dataHandler = {
-      onDataChanged(data) {
-        // Write-only form
-      }
-    };
 
     // Element SDK configuration
     async function onConfigChange(config) {
@@ -1086,8 +1148,10 @@
       document.body.style.background = `linear-gradient(135deg, ${backgroundColor} 0%, ${backgroundColor}dd 100%)`;
       document.querySelector('.form-card').style.background = cardColor;
       
-      document.querySelectorAll('.section-title, .form-header h1, label').forEach(el => {
-        el.style.color = textColor;
+      document.querySelectorAll('label, p').forEach(el => {
+        if (!el.closest('.info-box')) {
+          el.style.color = textColor;
+        }
       });
       
       document.querySelector('.form-header h1').style.color = primaryActionColor;
@@ -1109,6 +1173,9 @@
       });
       
       document.querySelector('.btn-clear').style.background = secondaryActionColor;
+      document.querySelectorAll('.btn-remove-row').forEach(el => {
+        el.style.background = secondaryActionColor;
+      });
       
       const customFont = config.font_family || defaultConfig.font_family;
       const baseSize = config.font_size || defaultConfig.font_size;
@@ -1137,35 +1204,35 @@
             get: () => config.background_color || defaultConfig.background_color,
             set: (value) => {
               config.background_color = value;
-              window.elementSdk.setConfig({ background_color: value });
+              if (window.elementSdk) window.elementSdk.setConfig({ background_color: value });
             }
           },
           {
             get: () => config.card_color || defaultConfig.card_color,
             set: (value) => {
               config.card_color = value;
-              window.elementSdk.setConfig({ card_color: value });
+              if (window.elementSdk) window.elementSdk.setConfig({ card_color: value });
             }
           },
           {
             get: () => config.text_color || defaultConfig.text_color,
             set: (value) => {
               config.text_color = value;
-              window.elementSdk.setConfig({ text_color: value });
+              if (window.elementSdk) window.elementSdk.setConfig({ text_color: value });
             }
           },
           {
             get: () => config.primary_action_color || defaultConfig.primary_action_color,
             set: (value) => {
               config.primary_action_color = value;
-              window.elementSdk.setConfig({ primary_action_color: value });
+              if (window.elementSdk) window.elementSdk.setConfig({ primary_action_color: value });
             }
           },
           {
             get: () => config.secondary_action_color || defaultConfig.secondary_action_color,
             set: (value) => {
               config.secondary_action_color = value;
-              window.elementSdk.setConfig({ secondary_action_color: value });
+              if (window.elementSdk) window.elementSdk.setConfig({ secondary_action_color: value });
             }
           }
         ],
@@ -1174,14 +1241,14 @@
           get: () => config.font_family || defaultConfig.font_family,
           set: (value) => {
             config.font_family = value;
-            window.elementSdk.setConfig({ font_family: value });
+            if (window.elementSdk) window.elementSdk.setConfig({ font_family: value });
           }
         },
         fontSizeable: {
           get: () => config.font_size || defaultConfig.font_size,
           set: (value) => {
             config.font_size = value;
-            window.elementSdk.setConfig({ font_size: value });
+            if (window.elementSdk) window.elementSdk.setConfig({ font_size: value });
           }
         }
       };
@@ -1198,13 +1265,6 @@
     async function init() {
       initSignaturePad();
       
-      if (window.dataSdk) {
-        const initResult = await window.dataSdk.init(dataHandler);
-        if (!initResult.isOk) {
-          console.error("Failed to initialize Data SDK");
-        }
-      }
-      
       if (window.elementSdk) {
         await window.elementSdk.init({
           defaultConfig,
@@ -1217,5 +1277,5 @@
 
     init();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a05723c453efd8f',t:'MTc2MzQ0NzcxMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9a0b6cd7e6c2ce7f',t:'MTc2MzUxMDQwNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
